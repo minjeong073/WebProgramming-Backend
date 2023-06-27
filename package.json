@@ -1,0 +1,14 @@
+{
+  "name": "web-backend-2023-summer",
+  "version": "1.0.0",
+  "description": "2023 여름학기 웹프로그래밍 백엔드 프로젝트",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "김민정",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
