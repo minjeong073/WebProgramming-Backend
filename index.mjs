@@ -7,6 +7,10 @@ app.get('/', (req, res) => {
   res.json({ message: 'Hello' });
 });
 
+app.get('/home', (req, res) => {
+  res.json({ message: 'server OK!' });
+});
+
 app.listen(5000, () => {
   console.log('server open!');
 });
