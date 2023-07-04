@@ -14,11 +14,14 @@ const pool = new pg.Pool({
 // console.log(result);
 // console.log(result.rows);
 
+let visit = 0;
+
 app.get('/', (req, res) => {
   res.json({ message: 'Hello' });
 });
 
 app.get('/home', (req, res) => {
+  visit += 1;
   res.json({ message: 'server OK!' });
 });
 
@@ -27,6 +30,10 @@ app.get('/student', async (req, res) => {
   const result = await client.query('SELECT * FROM student');
   res.json(result.rows);
   client.release();
+});
+
+app.get('/show', (req, res) => {
+  res.json({ message: `${visit} 회` });
 });
 
 app.listen(5000, () => {
