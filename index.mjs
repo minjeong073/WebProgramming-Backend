@@ -2,6 +2,7 @@ import express from 'express'; // module 로 가져오는 방식
 // const express = require('express'); // commonJS 로 가져오는 방식
 import pg from 'pg'; // DB 연결하기 위한 방식 1) connection, 2) connection pool
 // instance와 server 연결하는 방법
+import bodyParser from 'body-parser';
 
 const app = express();
 const pool = new pg.Pool({
@@ -10,6 +11,8 @@ const pool = new pg.Pool({
   password: '^K%idJElimf&NnyC!W[_6f2hVm1F%c;}',
   database: 'postgres',
 });
+
+app.use(bodyParser.json());
 
 let visit = 0;
 
@@ -58,6 +61,42 @@ app.get('/student', async (req, res) => {
     const result = await client.query('SELECT * FROM student');
     res.json(result.rows);
   }
+  client.release();
+});
+
+// 데이터 추가 API
+app.post('/student', async (req, res) => {
+  const client = await pool.connect();
+
+  // 중복된 id 일 경우 (db에 이미 데이터가 존재할 경우) insert 생략할 수 있도록
+  const idCheck = await client.query('SELECT * FROM student WHERE id = $1', [
+    req.body.id,
+  ]);
+  // 중복된 id 없을 경우 insert query
+  if (idCheck.rowCount == 0) {
+    const result = await client.query(
+      'INSERT INTO student (id, gpa, name, major) VALUES ($1, $2, $3, $4)',
+      [req.body.id, req.body.gpa, req.body.name, req.body.major]
+    );
+  }
+  // 중복된 id 있을 경우 update query
+  else {
+    const result = await client.query(
+      'UPDATE student SET gpa = $1, name = $2, major = $3 WHERE id = $4',
+      [req.body.gpa, req.body.name, req.body.major, req.body.id]
+    );
+  }
+  res.json(result.rows);
+  client.release();
+});
+
+// 데이터 삭제 API
+app.delete('/student', async (req, res) => {
+  const id = req.query.id;
+  const client = await pool.connect();
+
+  const result = await client.query('DELETE FROM student WHERE id = $1', [id]);
+  res.json('delete success!');
   client.release();
 });
 
