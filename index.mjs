@@ -3,14 +3,22 @@ import express from 'express'; // module 로 가져오는 방식
 import pg from 'pg'; // DB 연결하기 위한 방식 1) connection, 2) connection pool
 // instance와 server 연결하는 방법
 import bodyParser from 'body-parser';
+import cors from 'cors';
 
 const app = express();
+
 const pool = new pg.Pool({
   host: 'ls-36013ca3bc63e5519bfd9d3387a46189c9b13beb.cnankpeeqn4z.ap-northeast-2.rds.amazonaws.com',
   user: 'dbmasteruser',
   password: '^K%idJElimf&NnyC!W[_6f2hVm1F%c;}',
   database: 'postgres',
 });
+
+const corsOptions = {
+  origin: 'http://localhost:5173',
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 app.use(bodyParser.json());
 
@@ -78,6 +86,7 @@ app.post('/student', async (req, res) => {
       'INSERT INTO student (id, gpa, name, major) VALUES ($1, $2, $3, $4)',
       [req.body.id, req.body.gpa, req.body.name, req.body.major]
     );
+    res.json(result.rows);
   }
   // 중복된 id 있을 경우 update query
   else {
@@ -85,8 +94,8 @@ app.post('/student', async (req, res) => {
       'UPDATE student SET gpa = $1, name = $2, major = $3 WHERE id = $4',
       [req.body.gpa, req.body.name, req.body.major, req.body.id]
     );
+    res.json(result.rows);
   }
-  res.json(result.rows);
   client.release();
 });
 
