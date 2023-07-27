@@ -4,6 +4,9 @@ import pg from 'pg'; // DB 연결하기 위한 방식 1) connection, 2) connecti
 // instance와 server 연결하는 방법
 import bodyParser from 'body-parser';
 import cors from 'cors';
+import passport from 'passport';
+import { Strategy } from 'passport-local';
+import jwt from 'jsonwebtoken';
 
 const app = express();
 
@@ -13,6 +16,26 @@ const pool = new pg.Pool({
   password: '^K%idJElimf&NnyC!W[_6f2hVm1F%c;}',
   database: 'postgres',
 });
+
+passport.use(
+  new Strategy(
+    {
+      usernameField: 'email',
+      passwordField: 'password',
+    },
+    (username, password, done) => {
+      if (username === 'admin@admin.com' && password === 'admin') {
+        return done(null, {
+          id: admin,
+        });
+      } else {
+        done(null, false);
+        // 아래에 id, pw 에 따라 다른 error 출력 로직 작성
+      }
+    }
+  )
+);
+passport.initialize();
 
 const corsOptions = {
   origin: 'http://localhost:5173',
@@ -70,6 +93,18 @@ app.get('/student', async (req, res) => {
     res.json(result.rows);
   }
   client.release();
+});
+
+// login API
+app.post('/login', (req, res, next) => {
+  // session 사용하지 않도록 임시 설정
+  passport.authenticate('local', { session: false }, (err, user) => {
+    if (!user) {
+      res.status(403).send('Login Failed');
+    }
+    const token = jwt.sign(user, '1f$8as01n&1f@8as0px&');
+    return res.json({ user, token });
+  })(req, res);
 });
 
 // 데이터 추가 API
