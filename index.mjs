@@ -5,7 +5,8 @@ import pg from 'pg'; // DB 연결하기 위한 방식 1) connection, 2) connecti
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import passport from 'passport';
-import { Strategy } from 'passport-local';
+import localPass from 'passport-local';
+import jwtPass from 'passport-jwt';
 import jwt from 'jsonwebtoken';
 
 const app = express();
@@ -17,26 +18,6 @@ const pool = new pg.Pool({
   database: 'postgres',
 });
 
-passport.use(
-  new Strategy(
-    {
-      usernameField: 'email',
-      passwordField: 'password',
-    },
-    (username, password, done) => {
-      if (username === 'admin@admin.com' && password === 'admin') {
-        return done(null, {
-          id: admin,
-        });
-      } else {
-        done(null, false);
-        // 아래에 id, pw 에 따라 다른 error 출력 로직 작성
-      }
-    }
-  )
-);
-passport.initialize();
-
 const corsOptions = {
   origin: 'http://localhost:5173',
   credentials: true,
@@ -44,6 +25,46 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use(bodyParser.json());
+
+// 다른 함수에서 토큰을 이용한 인증을 사용할 수 있도록 설정
+passport.use(
+  'jwt',
+  new jwtPass.Strategy(
+    {
+      jwtFromRequest: jwtPass.ExtractJwt.fromAuthHeaderAsBearerToken(),
+      secretOrKey: 'secret',
+    },
+    (jwt_payload, done) => {
+      done(null, {
+        id: jwt_payload.id,
+      });
+    }
+  )
+);
+
+// 처음 로그인 할 때 사용되는 함수
+passport.use(
+  'local',
+  new localPass.Strategy(
+    { usernameField: 'userId', passwordField: 'password' },
+    async (username, password, done) => {
+      const client = await pool.connect();
+      const result = await client.query(
+        'SELECT * FROM public.user WHERE id = $1 and password = $2',
+        [username, password]
+      );
+      client.release(); // database 연결 해제
+      // id, pw 일치하는 데이터가 있을 경우
+      if (result.rowCount === 1) {
+        return done(null, { username });
+      }
+
+      return done(null, false, { reason: 'Invalid username or password' });
+    }
+  )
+);
+
+app.use(passport.initialize());
 
 let visit = 0;
 
@@ -55,6 +76,21 @@ app.get('/home', (req, res) => {
   visit += 1;
   res.json({ message: 'server OK!' });
 });
+
+app.get(
+  '/mypage',
+  passport.authenticate('jwt', { session: false }),
+  async (req, res) => {
+    const client = await pool.connect();
+    const result = await client.query(
+      'SELECT id, name, nickname FROM public.user WHERE id = $1',
+      [req.user.id]
+    );
+
+    res.json(result.rows[0]);
+    client.release();
+  }
+);
 
 app.get('/student', async (req, res) => {
   const client = await pool.connect(); // 함수 결과값 : Promist<pg.PoolClient>
@@ -95,16 +131,23 @@ app.get('/student', async (req, res) => {
   client.release();
 });
 
-// login API
+// 로그인 구현
 app.post('/login', (req, res, next) => {
-  // session 사용하지 않도록 임시 설정
-  passport.authenticate('local', { session: false }, (err, user) => {
-    if (!user) {
-      res.status(403).send('Login Failed');
+  passport.authenticate('local', (err, user, info) => {
+    if (err || !user) {
+      return next(err);
     }
-    const token = jwt.sign(user, '1f$8as01n&1f@8as0px&');
-    return res.json({ user, token });
-  })(req, res);
+    if (info) {
+      return res.status(410).send(info.reason);
+    }
+    return req.login(user, { session: false }, (loginErr) => {
+      if (loginErr) {
+        return next(loginErr);
+      }
+      const token = jwt.sign({ id: user.username }, 'secret');
+      return res.json({ token: token });
+    });
+  })(req, res, next);
 });
 
 // 데이터 추가 API
